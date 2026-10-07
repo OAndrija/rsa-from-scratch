@@ -50,6 +50,8 @@ unsigned long long naive(LCG &lcg, unsigned long long x, unsigned long long y) {
     }
 }
 
+unsigned long long miller_rabin_test(LCG &lcg) { return 0; }
+
 void lcg_test(LCG &lcg) {
     const int min = 1;
     const int max = 1000;
@@ -81,8 +83,89 @@ void lcg_test(LCG &lcg) {
     std::cout << "Results saved to histogram.csv file" << std::endl;
 }
 
+unsigned long long min_from_bits(int bits) {
+    return 1ULL << (bits - 1);
+}
+
+unsigned long long max_from_bits(int bits) {
+    return (1ULL << bits) - 1;
+}
+
+void print_menu() {
+    std::cout << "GENERATOR PRASTEVIL" << std::endl;
+    std::cout << "1. Generiranje prastevil - naivna metoda" << std::endl;
+    std::cout << "2. Generiranje prastevil - Miller-Rabin" << std::endl;
+    std::cout << "3. Test prastevilnosti - naivna metoda" << std::endl;
+    std::cout << "4. Test prastevilnosti - Miller-Rabin" << std::endl;
+    std::cout << "5. Test LCG generatorja" << std::endl;
+    std::cout << "0. Izhod" << std::endl;
+    std::cout << "\nIzbira: ";
+}
+
 int main() {
     LCG lcg;
+    int choice;
+
+    do {
+        print_menu();
+        std::cin >> choice;
+
+        switch (choice) {
+            case 1: {
+                int bits;
+
+                std::cout << "Izbrali ste generiranje prastevil z naivno metodo.\n\n";
+                std::cout << "Vnesite stevilo bitov (2-32): ";
+                std::cin >> bits;
+
+                if (bits < 2 || bits > 32) {
+                    std::cout << "Stevilo bitov omejeno med 2 in 32.\n" << std::endl;
+                    break;
+                }
+
+                unsigned long long min = min_from_bits(bits);
+                unsigned long long max = max_from_bits(bits);
+
+                std::cout << "Obmocje stevil: " << min << " - " << max << std::endl;
+
+                unsigned long long prime = naive(lcg, min, max);
+
+                std::cout << "Najdeno prastevilo: " << prime << std::endl;
+
+                break;
+            }
+
+            case 2:
+                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+                break;
+
+
+            case 3:
+                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+                break;
+
+
+            case 4:
+                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+                break;
+
+
+            case 5:
+                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+                break;
+
+
+            case 0:
+                break;
+
+            default:
+                std::cout << "\nNapacna izbira. Opcija " << choice << " ne obstaja." << std::endl;
+                std::cout << "Poskusite ponovo." << std::endl;
+        }
+    } while (choice != 0);
+
+    return 0;
+
 
     // for (int n = 3; n <= 10; n++) {
     //     unsigned long long x = 1;
