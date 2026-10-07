@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <chrono>
 
 class LCG {
 private:
@@ -23,7 +24,30 @@ public:
 };
 
 unsigned long long naive(LCG &lcg, unsigned long long x, unsigned long long y) {
-    //
+
+    unsigned long long p = lcg.random(x,y);
+
+    if (p % 2 == 0) {
+        p++;
+    }
+
+    while (true) {
+        unsigned long long j = 3;
+
+        while (j * j <= p) {
+            if (p % j == 0) {
+                break;
+            }
+
+            j += 2;
+        }
+
+        if (j * j > p) {
+            return p;
+        }
+
+        p += 2;
+    }
 }
 
 void lcg_test(LCG &lcg) {
@@ -60,5 +84,20 @@ void lcg_test(LCG &lcg) {
 int main() {
     LCG lcg;
 
+    // for (int n = 3; n <= 10; n++) {
+    //     unsigned long long x = 1;
+    //     for (int i = 1; i < n; i++) x *= 10;   // 10^(n-1)
+    //     unsigned long long y = x * 10 - 1;     // 10^n - 1
+    //
+    //     auto start = std::chrono::high_resolution_clock::now();
+    //     unsigned long long p = naive(lcg, x, y);
+    //     auto end = std::chrono::high_resolution_clock::now();
+    //
+    //     std::chrono::duration<double, std::milli> ms = end - start;
+    //
+    //     std::cout << "n = " << n << ", praštevilo: " << p
+    //               << ", čas: " << ms.count() << " ms" << std::endl;
+    // }
 
+    return 0;
 }
