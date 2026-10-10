@@ -167,6 +167,53 @@ unsigned long long max_from_bits(int bits) {
     return (1ULL << bits) - 1;
 }
 
+void prime_generation_timing_test(LCG lcg) {
+    const int minBits = 4;
+    const int maxBits = 32;
+    const int runs = 100;
+    const unsigned long long s = 10;
+
+    std::ofstream outfile("timing.csv");
+
+    if (!outfile) {
+        std::cerr << "Unable to open timing.csv" << std::endl;
+        return;
+    }
+
+    outfile << "Bits,Naive,MillerRabin\n";
+
+    volatile unsigned long long sink = 0;
+
+    for (int bits = minBits; bits <= maxBits; bits++) {
+        unsigned long long min = min_from_bits(bits);
+        unsigned long long max = max_from_bits(bits);
+
+        double naiveTotal = 0;
+        double mrTotal = 0;
+
+        for (int i = 0; i < runs; i++) {
+            auto start = std::chrono::high_resolution_clock::now();
+            sink = naive(lcg, min, max);
+            auto end = std::chrono::high_resolution_clock::now();
+            naiveTotal += std::chrono::duration<double, std::nano>(end - start).count();
+
+            start = std::chrono::high_resolution_clock::now();
+            sink = miller_rabin_generate(lcg, min, max, s);
+            end = std::chrono::high_resolution_clock::now();
+            mrTotal += std::chrono::duration<double, std::nano>(end - start).count();
+        }
+
+        outfile << bits << "," << naiveTotal / runs << "," << mrTotal / runs << "\n";
+
+        std::cout << "Bits: " << bits << " done" << std::endl;
+    }
+
+    outfile.close();
+
+    std::cout << "Results saved to timing.csv file" << std::endl;
+
+}
+
 void print_menu() {
     std::cout << "\t\tGENERATOR PRASTEVIL" << std::endl;
     std::cout << "----------------------------------------" << std::endl;
@@ -175,6 +222,7 @@ void print_menu() {
     std::cout << "3. Test prastevilnosti - naivna metoda" << std::endl;
     std::cout << "4. Test prastevilnosti - Miller-Rabin" << std::endl;
     std::cout << "5. Test LCG generatorja" << std::endl;
+    std::cout << "6. Test casa generiranja prastevil" << std::endl;
     std::cout << "0. Izhod" << std::endl;
     std::cout << "\nIzbira: ";
 }
@@ -300,12 +348,17 @@ int main() {
             }
 
 
-            case 5:
+            case 5: {
                 lcg_test(lcg);
                 std::cout << std::endl;
                 break;
+            }
 
-
+            case 6: {
+                prime_generation_timing_test(lcg);
+                std::cout << std::endl;
+                break;
+            }
             case 0:
                 break;
 
