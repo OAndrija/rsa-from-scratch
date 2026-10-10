@@ -23,34 +23,101 @@ public:
     }
 };
 
+bool naive_test(unsigned long long p) {
+    if (p < 2) return false;
+    if (p <= 3) return true;
+    if (p % 2 == 0) return false;
+
+    unsigned long long j = 3;
+
+    while (j * j <= p) {
+        if (p % j == 0) {
+            return false;
+        }
+
+        j += 2;
+    }
+
+    return true;
+}
+
 unsigned long long naive(LCG &lcg, unsigned long long x, unsigned long long y) {
 
     unsigned long long p = lcg.random(x,y);
 
-    if (p % 2 == 0) {
-        p++;
-    }
+    if (p % 2 == 0) p++;
 
     while (true) {
-        unsigned long long j = 3;
-
-        while (j * j <= p) {
-            if (p % j == 0) {
-                break;
-            }
-
-            j += 2;
-        }
-
-        if (j * j > p) {
-            return p;
-        }
+        if (naive_test(p)) return p;
 
         p += 2;
+
+        if (p > y) p = x + 1;
     }
 }
 
-unsigned long long miller_rabin_test(LCG &lcg) { return 0; }
+unsigned long long modular_exponentiation(unsigned long long a, unsigned long long b, unsigned long long n) {
+    unsigned long long d = 1;
+    int j = 0;
+    unsigned long long temp = b;
+
+    while (temp >>= 1) { //Set temp to itself shifted by one bit to the right 1011 -> 0101
+        j++;
+    }
+
+    for (int i = j; i >= 0; i--) {
+        d = ( d * d ) % n;
+        if ((b >> i) & 1) { // ">>" shift b i bits to the right , "&" is 1 if lsb is 1
+            d = (d * a) % n;
+        }
+    }
+
+    return d;
+}
+
+unsigned long long miller_rabin_test(LCG &lcg, unsigned long long p, unsigned long long s) {
+    if (p <= 3) return 1;   //prime
+    if (p % 2 == 0) return 0;   //composite
+
+    unsigned long long d = p - 1;
+    unsigned long long k = 0;
+
+    while (d % 2 == 0) {
+        d /= 2;
+        k++;
+    }
+
+    for (unsigned long long j = 1; j <= s; j++) {
+        unsigned long long a = lcg.random(2, p - 2);
+        unsigned long long x = modular_exponentiation(a, d, p);
+
+        if (x == 1) continue;
+
+        //če ∃i..
+        for (unsigned long long i = 0; i < k; i++) {
+            if (x == p - 1) break;
+            x = (x * x) % p;
+        }
+
+        if (x != p - 1) return 0;   //composite number
+    }
+
+    return 1;   //probably prime number
+}
+
+unsigned long long miller_rabin_generate(LCG &lcg, unsigned long long min, unsigned long long max, unsigned long long s) {
+    unsigned long long p = lcg.random(min, max);
+
+    if (p % 2 == 0) p++;
+
+    while (!miller_rabin_test(lcg, p, s)) {
+        p += 2;
+
+        if (p > max) p = min + 1;
+    }
+
+    return p;
+}
 
 void lcg_test(LCG &lcg) {
     const int min = 1;
@@ -92,7 +159,8 @@ unsigned long long max_from_bits(int bits) {
 }
 
 void print_menu() {
-    std::cout << "GENERATOR PRASTEVIL" << std::endl;
+    std::cout << "\t\tGENERATOR PRASTEVIL" << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
     std::cout << "1. Generiranje prastevil - naivna metoda" << std::endl;
     std::cout << "2. Generiranje prastevil - Miller-Rabin" << std::endl;
     std::cout << "3. Test prastevilnosti - naivna metoda" << std::endl;
@@ -114,7 +182,6 @@ int main() {
             case 1: {
                 int bits;
 
-                std::cout << "Izbrali ste generiranje prastevil z naivno metodo.\n\n";
                 std::cout << "Vnesite stevilo bitov (2-32): ";
                 std::cin >> bits;
 
@@ -126,32 +193,107 @@ int main() {
                 unsigned long long min = min_from_bits(bits);
                 unsigned long long max = max_from_bits(bits);
 
-                std::cout << "Obmocje stevil: " << min << " - " << max << std::endl;
+                std::cout << "\nObmocje stevil: " << min << " - " << max << std::endl;
 
                 unsigned long long prime = naive(lcg, min, max);
 
-                std::cout << "Najdeno prastevilo: " << prime << std::endl;
+                std::cout << "Najdeno prastevilo: " << prime << "\n" << std::endl;
 
                 break;
             }
 
-            case 2:
-                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+            case 2: {
+                int bits;
+                unsigned long long s;
+
+                std::cout << "Vnesite stevilo bitov (2-32): ";
+                std::cin >> bits;
+
+                if (bits < 2 || bits > 32) {
+                    std::cout << "Stevilo bitov omejeno med 2 in 32.\n" << std::endl;
+                    break;
+                }
+
+                std::cout << "Vnesite parameter s: ";
+                std::cin >> s;
+
+                if (s < 1 ) {
+                    std::cout << "Parameter s mora biti vsaj 1.\n" << std::endl;
+                    break;
+                }
+
+                unsigned long long min = min_from_bits(bits);
+                unsigned long long max = max_from_bits(bits);
+
+                std::cout << "\nObmocje stevil: " << min << " - " << max << std::endl;
+
+                unsigned long long prime = miller_rabin_generate(lcg, min, max, s);
+
+                std::cout << "Najdeno (verjetno) prastevilo: " << prime << "\n" << std::endl;
+
                 break;
+            }
 
 
-            case 3:
-                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+            case 3: {
+                unsigned long long number;
+
+                std::cout << "Vnesite stevilo (do 32 bitov): ";
+                std::cin >> number;
+
+                if (number > max_from_bits(32)) {
+                    std::cout << "Stevilo je vecje od 32 bitov.\n" << std::endl;
+                    break;
+                }
+
+                if (naive_test(number)) {
+                    std::cout << number << " je verjetno prastevilo.\n" << std::endl;
+                } else {
+                    std::cout << number << " je sestavljeno stevilo.\n" << std::endl;
+                }
+
                 break;
+            }
 
 
-            case 4:
-                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+            case 4: {
+                unsigned long long number;
+                unsigned long long s;
+
+                std::cout << "Vnesite stevilo (do 32 bitov): ";
+                std::cin >> number;
+
+                if (number > max_from_bits(32)) {
+                    std::cout << "Stevilo je vecje od 32 bitov.\n" << std::endl;
+                    break;
+                }
+
+                std::cout << "Vnesite parameter s: ";
+                std::cin >> s;
+
+                if (s < 1) {
+                    std::cout << "Parameter s mora biti vsaj 1.\n" << std::endl;
+                    break;
+                }
+
+                if (number < 2) {   //0 and 1 are not prime
+                    std::cout << number << " ni prastevilo.\n" << std::endl;
+                    break;
+                }
+
+                if (miller_rabin_test(lcg, number, s)) {
+                    std::cout << number << " je verjetno prastevilo.\n" << std::endl;
+                } else {
+                    std::cout << number << " je sestavljeno stevilo.\n" << std::endl;
+                }
+
                 break;
+            }
 
 
             case 5:
-                std::cout << "Izbrali ste generiranje prastevil z Miller-Rabinovo metodo." << std::endl;
+                lcg_test(lcg);
+                std::cout << std::endl;
                 break;
 
 
@@ -160,7 +302,7 @@ int main() {
 
             default:
                 std::cout << "\nNapacna izbira. Opcija " << choice << " ne obstaja." << std::endl;
-                std::cout << "Poskusite ponovo." << std::endl;
+                std::cout << "Poskusite ponovo.\n";
         }
     } while (choice != 0);
 
