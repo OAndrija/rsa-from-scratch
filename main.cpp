@@ -180,7 +180,7 @@ void prime_generation_timing_test(LCG lcg) {
         return;
     }
 
-    outfile << "Bits,Naive,MillerRabin\n";
+    outfile << "Bits,Naive_ns,MillerRabin_ns\n";
 
     volatile unsigned long long sink = 0;
 
@@ -214,6 +214,46 @@ void prime_generation_timing_test(LCG lcg) {
 
 }
 
+void miller_rabin_s_timing_test(LCG lcg) {
+    const int bits = 32;
+    const int minS = 1;
+    const int maxS = 20;
+    const int runs = 1000;
+
+    unsigned long long min = min_from_bits(bits);
+    unsigned long long max = max_from_bits(bits);
+
+    std::ofstream outfile("timing_s.csv");
+
+    if (!outfile) {
+        std::cerr << "Unable to open timing_s.csv" << std::endl;
+        return;
+    }
+
+    outfile << "s,MillerRabin_ns\n";
+
+    volatile unsigned long long sink = 0;
+
+    for (int s = minS; s <= maxS; s++) {
+        double total = 0;
+
+        for (int i = 0; i < runs; i++) {
+            auto start = std::chrono::high_resolution_clock::now();
+            sink = miller_rabin_generate(lcg, min, max, s);
+            auto end = std::chrono::high_resolution_clock::now();
+            total += std::chrono::duration<double, std::nano>(end - start).count();
+        }
+
+        outfile << s << "," << total / runs << "\n";
+
+        std::cout << "s: " << s << " done" << std::endl;
+    }
+
+    outfile.close();
+
+    std::cout << "Results saved to timing_s.csv file" << std::endl;
+}
+
 void print_menu() {
     std::cout << "\t\tGENERATOR PRASTEVIL" << std::endl;
     std::cout << "----------------------------------------" << std::endl;
@@ -222,7 +262,8 @@ void print_menu() {
     std::cout << "3. Test prastevilnosti - naivna metoda" << std::endl;
     std::cout << "4. Test prastevilnosti - Miller-Rabin" << std::endl;
     std::cout << "5. Test LCG generatorja" << std::endl;
-    std::cout << "6. Test casa generiranja prastevil" << std::endl;
+    std::cout << "6. Test casovne zahtevnosti generiranja prastevil" << std::endl;
+    std::cout << "7. Test casovne zahtevnosti glede na parameter s" << std::endl;
     std::cout << "0. Izhod" << std::endl;
     std::cout << "\nIzbira: ";
 }
@@ -356,9 +397,15 @@ int main() {
 
             case 6: {
                 prime_generation_timing_test(lcg);
+                break;
+            }
+
+            case 7: {
+                miller_rabin_s_timing_test(lcg);
                 std::cout << std::endl;
                 break;
             }
+
             case 0:
                 break;
 
