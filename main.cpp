@@ -24,9 +24,8 @@ public:
 };
 
 bool naive_test(unsigned long long p) {
-    if (p < 2) return false;
-    if (p <= 3) return true;
-    if (p % 2 == 0) return false;
+    if (p < 2 || p % 2 == 0) return false;
+    if (p == 2 || p == 3) return true;
 
     unsigned long long j = 3;
 
@@ -45,14 +44,20 @@ unsigned long long naive(LCG &lcg, unsigned long long x, unsigned long long y) {
 
     unsigned long long p = lcg.random(x,y);
 
-    if (p % 2 == 0) p++;
+    if (p % 2 == 0) {
+        p++;
+    }
 
     while (true) {
-        if (naive_test(p)) return p;
+        if (naive_test(p)) {
+            return p;
+        }
 
         p += 2;
 
-        if (p > y) p = x + 1;
+        if (p > y) {
+            p = x + 1;
+        }
     }
 }
 
@@ -75,9 +80,9 @@ unsigned long long modular_exponentiation(unsigned long long a, unsigned long lo
     return d;
 }
 
-unsigned long long miller_rabin_test(LCG &lcg, unsigned long long p, unsigned long long s) {
-    if (p <= 3) return 1;   //prime
-    if (p % 2 == 0) return 0;   //composite
+bool miller_rabin_test(LCG &lcg, unsigned long long p, unsigned long long s) {
+    if (p <= 3) return true;   //prime
+    if (p % 2 == 0) return false;   //composite
 
     unsigned long long d = p - 1;
     unsigned long long k = 0;
@@ -99,21 +104,25 @@ unsigned long long miller_rabin_test(LCG &lcg, unsigned long long p, unsigned lo
             x = (x * x) % p;
         }
 
-        if (x != p - 1) return 0;   //composite number
+        if (x != p - 1) return false;   //composite number
     }
 
-    return 1;   //probably prime number
+    return true;   //probably prime number
 }
 
 unsigned long long miller_rabin_generate(LCG &lcg, unsigned long long min, unsigned long long max, unsigned long long s) {
     unsigned long long p = lcg.random(min, max);
 
-    if (p % 2 == 0) p++;
+    if (p % 2 == 0) {
+        p++;
+    }
 
     while (!miller_rabin_test(lcg, p, s)) {
         p += 2;
 
-        if (p > max) p = min + 1;
+        if (p > max) {
+            p = min + 1;
+        }
     }
 
     return p;
@@ -247,9 +256,9 @@ int main() {
                 }
 
                 if (naive_test(number)) {
-                    std::cout << number << " je verjetno prastevilo.\n" << std::endl;
+                    std::cout << number << " je PRASTEVILO.\n" << std::endl;
                 } else {
-                    std::cout << number << " je sestavljeno stevilo.\n" << std::endl;
+                    std::cout << number << " je SESTAVLJENO STEVILO.\n" << std::endl;
                 }
 
                 break;
@@ -277,14 +286,14 @@ int main() {
                 }
 
                 if (number < 2) {   //0 and 1 are not prime
-                    std::cout << number << " ni prastevilo.\n" << std::endl;
+                    std::cout << number << " je SESTAVLJENO STEVILO.\n" << std::endl;
                     break;
                 }
 
                 if (miller_rabin_test(lcg, number, s)) {
-                    std::cout << number << " je verjetno prastevilo.\n" << std::endl;
+                    std::cout << number << " je VERJETNO PRASTEVILO.\n" << std::endl;
                 } else {
-                    std::cout << number << " je sestavljeno stevilo.\n" << std::endl;
+                    std::cout << number << " je SESTAVLJENO STEVILO.\n" << std::endl;
                 }
 
                 break;
@@ -305,24 +314,6 @@ int main() {
                 std::cout << "Poskusite ponovo.\n";
         }
     } while (choice != 0);
-
-    return 0;
-
-
-    // for (int n = 3; n <= 10; n++) {
-    //     unsigned long long x = 1;
-    //     for (int i = 1; i < n; i++) x *= 10;   // 10^(n-1)
-    //     unsigned long long y = x * 10 - 1;     // 10^n - 1
-    //
-    //     auto start = std::chrono::high_resolution_clock::now();
-    //     unsigned long long p = naive(lcg, x, y);
-    //     auto end = std::chrono::high_resolution_clock::now();
-    //
-    //     std::chrono::duration<double, std::milli> ms = end - start;
-    //
-    //     std::cout << "n = " << n << ", praštevilo: " << p
-    //               << ", čas: " << ms.count() << " ms" << std::endl;
-    // }
 
     return 0;
 }
