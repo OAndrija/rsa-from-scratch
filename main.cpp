@@ -24,8 +24,8 @@ public:
 };
 
 bool naive_test(unsigned long long p) {
-    if (p < 2 || p % 2 == 0) return false;
     if (p == 2 || p == 3) return true;
+    if (p < 2 || p % 2 == 0) return false;
 
     unsigned long long j = 3;
 
