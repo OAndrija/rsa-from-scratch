@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
+#include <vector>
 
 class LCG {
 private:
@@ -126,6 +127,52 @@ unsigned long long miller_rabin_generate(LCG &lcg, unsigned long long min, unsig
     }
 
     return p;
+}
+
+long long mod(long long a, long long n) {
+    long long reminder = a % n;
+
+    if (reminder < 0) {
+        reminder += n;
+    }
+
+    return reminder;
+}
+
+void extended_euclid(long long a, long long b, long long& d, long long& x, long long& y) {
+    if (b == 0) {
+        d = a;
+        x = 1;
+        y = 0;
+    } else {
+        long long n_d, n_x, n_y;
+
+        extended_euclid(b, a % b, n_d, n_x, n_y);
+
+        d = n_d;
+        x = n_y;
+        y = n_x - (a / b) * n_y;
+    }
+}
+
+std::vector<long long> modular_linear_equation_solver(long long a, long long b, long long n) {
+    long long d, x, y;
+
+    extended_euclid(a, n, d, x, y);
+
+    if (b % d != 0) {
+        return {};
+    }
+
+    long long x0 = mod(x * (b / d), n);
+    std::vector<long long> solutions;
+
+    for (int i = 0; i < d; i++) {
+        long long solution = mod(x0 + i * (n / d), n);
+        solutions.push_back(solution);
+    }
+
+    return solutions;
 }
 
 void lcg_test(LCG &lcg) {
@@ -403,6 +450,16 @@ int main() {
             case 7: {
                 miller_rabin_s_timing_test(lcg);
                 std::cout << std::endl;
+                break;
+            }
+
+            case 8: {
+                long long t1 = mod(-17, 40);
+                long long t2 = mod(23, 40);
+                long long t3 = mod(-40, 40);
+                long long t4 = mod(-81, 40);
+
+                std::cout << "TEST OF MODULE IMPLEMENTATION\nT1: " << t1 << "\nT2: " << t2 << "\nT3: " << t3 << "\nT4: " << t4 << std::endl;
                 break;
             }
 
