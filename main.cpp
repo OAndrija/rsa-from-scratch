@@ -24,6 +24,10 @@ public:
     }
 };
 
+struct RSAKeys {
+    long long e, d, n;
+};
+
 bool naive_test(unsigned long long p) {
     if (p == 2 || p == 3) return true;
     if (p < 2 || p % 2 == 0) return false;
@@ -129,6 +133,14 @@ unsigned long long miller_rabin_generate(LCG &lcg, unsigned long long min, unsig
     return p;
 }
 
+unsigned long long min_from_bits(int bits) {
+    return 1ULL << (bits - 1);
+}
+
+unsigned long long max_from_bits(int bits) {
+    return (1ULL << bits) - 1;
+}
+
 long long mod(long long a, long long n) {
     long long reminder = a % n;
 
@@ -175,6 +187,75 @@ std::vector<long long> modular_linear_equation_solver(long long a, long long b, 
     return solutions;
 }
 
+unsigned long long generate_prime(LCG& lcg, int bits, bool useMillerRabin, unsigned long long s) {
+    unsigned long long min = min_from_bits(bits);
+    unsigned long long max = max_from_bits(bits);
+
+    if (useMillerRabin) {
+        return miller_rabin_generate(lcg, min, max, s);
+    }
+
+    return naive(lcg, min, max);
+}
+
+RSAKeys generate_keys(LCG& lcg, int bits, bool useMillerRabin, unsigned long long s) {
+    // Step 1: generate two different prime numbers
+    unsigned long long p = generate_prime(lcg, bits, useMillerRabin, s);
+    unsigned long long q;
+    do {
+        q = generate_prime(lcg, bits, useMillerRabin, s);
+    } while (q == p);
+
+    // Step 2: n and phi
+    long long n = static_cast<long long>(p * q);
+    long long phi = static_cast<long long>((p - 1) * (q - 1));
+
+    // Step 3: random odd e with 1 < e < phi and gcd(e,phi) = 1
+    long long e, gcd, x, y;
+    do {
+        e = static_cast<long long>(lcg.random(3, phi - 1));
+        extended_euclid(e, phi, gcd, x, y);
+    } while (e % 2 == 0 || gcd != 1);
+
+    // Step 4: Get multiplicative inverse of e mod phi => e * d = 1 (mod phi)
+    std::vector<long long> solutions = modular_linear_equation_solver(e, 1, phi);
+    long long d = solutions[0]; // gcd is 1, there is exactly 1 solution
+
+    // Step 5: public is pair of e and n, private is pair of d and n
+    RSAKeys keys;
+    keys.e = e;
+    keys.d = d;
+    keys.n = n;
+
+    return keys;
+}
+
+bool save_keys(const RSAKeys& keys) {
+    std::ofstream public_key("pubkey.txt");
+    std::ofstream private_key("privkey.txt");
+
+    if (!public_key || !private_key) {
+        return false;
+    }
+
+    public_key << keys.e << " " << keys.n << "\n";
+    private_key << keys.d << " " << keys.n << "\n";
+
+    return true;
+}
+
+bool load_key(const std::string& filename, long long& e, long long& n) {
+    std::ifstream input(filename);
+
+    if (!input) {
+        return false;
+    }
+
+    input >> e >> n;
+
+    return !input.fail();
+}
+
 void lcg_test(LCG &lcg) {
     const int min = 1;
     const int max = 1000;
@@ -204,14 +285,6 @@ void lcg_test(LCG &lcg) {
 
     std::cout << "Generated " << numberOfValues << " numbers" << std::endl;
     std::cout << "Results saved to histogram.csv file" << std::endl;
-}
-
-unsigned long long min_from_bits(int bits) {
-    return 1ULL << (bits - 1);
-}
-
-unsigned long long max_from_bits(int bits) {
-    return (1ULL << bits) - 1;
 }
 
 void prime_generation_timing_test(LCG lcg) {
@@ -311,6 +384,9 @@ void print_menu() {
     std::cout << "5. Test LCG generatorja" << std::endl;
     std::cout << "6. Test casovne zahtevnosti generiranja prastevil" << std::endl;
     std::cout << "7. Test casovne zahtevnosti glede na parameter s" << std::endl;
+    std::cout << "8. Generiranje RSA kljucev" << std::endl;
+    std::cout << "9. Sifriranje stevila" << std::endl;
+    std::cout << "10. Desifriranje stevila" << std::endl;
     std::cout << "0. Izhod" << std::endl;
     std::cout << "\nIzbira: ";
 }
@@ -454,12 +530,83 @@ int main() {
             }
 
             case 8: {
-                long long t1 = mod(-17, 40);
-                long long t2 = mod(23, 40);
-                long long t3 = mod(-40, 40);
-                long long t4 = mod(-81, 40);
+                int bits, method;
 
-                std::cout << "TEST OF MODULE IMPLEMENTATION\nT1: " << t1 << "\nT2: " << t2 << "\nT3: " << t3 << "\nT4: " << t4 << std::endl;
+                std::cout << "Vnesite stevilo bitov(3-15): ";
+                std::cin >> bits;
+
+                if (bits < 3 || bits > 15) {
+                    std::cout << "Obmocje bitov od 3 do 15.\n" << std::endl;
+                    break;
+                }
+
+                std::cout << "Metoda (1 = naiva, 2 = Miller-Rabin: ";
+                std::cin >> method;
+
+                if (method != 1 && method != 2) {
+                    std::cout << "Napacna izbira metode.\n" << std::endl;
+                    break;
+                }
+
+                bool useMillerRabin = (method == 2);
+
+                RSAKeys keys = generate_keys(lcg, bits, useMillerRabin, 10);
+
+                std::cout << "Javni kljuc: " << keys.e << ", " << keys.n << std::endl;
+                std::cout << "Privatni kljuc: " << keys.d << ", " << keys.n << std::endl;
+
+                if (save_keys(keys)) {
+                    std::cout << "Kljuci vspesno shranjeni v pubkey.txt in privkey.txt.\n" << std::endl;
+                } else {
+                    std::cout << "Napaka pri shranjevanju datotek.\n" << std::endl;
+                }
+
+                break;
+            }
+
+            case 9: {
+                long long e, n , M;
+
+                if (!load_key("pubkey.txt", e, n)) {
+                    std::cout << "Najprej generirajte kljuce.\n" << std::endl;
+                    break;
+                }
+
+                std::cout << "Vnesite sporocilo M: ";
+                std::cin >> M;
+
+                if (M < 0 || M >= n) {
+                    std::cout << "M mora biti manjse od n.\n" << std::endl;
+                    break;
+                }
+
+                long long C = modular_exponentiation(M, e, n);
+
+                std::cout << "C = " << C << std::endl << std::endl;
+
+                break;
+            }
+
+            case 10: {
+                long long d, n, C;
+
+                if (!load_key("privkey.txt", d, n)) {
+                    std::cout << "Najprej generirajte kljuc.\n" << std::endl;
+                    break;
+                }
+
+                std::cout << "Vnesite sifrirano sporocilo C: ";
+                std::cin >> C;
+
+                if (C < 0 || C >= n) {
+                    std::cout << "C mora biti manjse od n.\n" << std::endl;
+                    break;
+                }
+
+                long long M = modular_exponentiation(C, d, n);
+
+                std::cout << "M = " << M << std::endl << std::endl;
+
                 break;
             }
 
