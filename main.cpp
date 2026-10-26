@@ -3,6 +3,9 @@
 #include <chrono>
 #include <vector>
 
+#include "BitReader.h"
+#include "BitWriter.h"
+
 class LCG {
 private:
     unsigned long long R;
@@ -222,26 +225,24 @@ int log2_up(unsigned long long n) {
 }
 
 RSAKeys generate_keys(LCG& lcg, int bits, bool useMillerRabin, unsigned long long s) {
-    // Step 1: generate two different prime numbers
     unsigned long long p = generate_prime(lcg, bits, useMillerRabin, s);
     unsigned long long q;
     do {
         q = generate_prime(lcg, bits, useMillerRabin, s);
     } while (q == p);
 
-    // Step 2: n and phi
     long long n = static_cast<long long>(p * q);
-    long long phi = static_cast<long long>((p - 1) * (q - 1));
+    long long fi = static_cast<long long>((p - 1) * (q - 1));
 
     // Step 3: random odd e with 1 < e < phi and gcd(e,phi) = 1
     long long e, gcd, x, y;
     do {
-        e = static_cast<long long>(lcg.random(3, phi - 1));
-        extended_euclid(e, phi, gcd, x, y);
+        e = static_cast<long long>(lcg.random(3, fi - 1));
+        extended_euclid(e, fi, gcd, x, y);
     } while (e % 2 == 0 || gcd != 1);
 
     // Step 4: Get multiplicative inverse of e mod phi => e * d = 1 (mod phi)
-    std::vector<long long> solutions = modular_linear_equation_solver(e, 1, phi);
+    std::vector<long long> solutions = modular_linear_equation_solver(e, 1, fi);
     long long d = solutions[0]; // gcd is 1, there is exactly 1 solution
 
     // Step 5: public is pair of e and n, private is pair of d and n
@@ -277,6 +278,95 @@ bool load_key(const std::string& filename, long long& e, long long& n) {
     input >> e >> n;
 
     return !input.fail();
+}
+
+// Sifriranje datotek z javnim kljucem (e, n)
+// Datoteke beremo po log2_down(n) bitov
+// Sifriran blok C je lahko najvec n-1, zato ga zapisemo z log2_up(n) biti, en bit vec kot M
+bool encrypt_file(const std::string& inputName, const std::string& outputName, long long e, long long n) {
+    std::ifstream input(inputName);
+    std::ofstream output(outputName);
+
+    if (!input || !output) {
+        return false;
+    }
+
+    // Dolocimo velikost vhodne datoteke v bajtih
+    input.seekg(0, std::ios::end);
+    unsigned long long fileSize = input.tellg();
+    input.seekg(0, std::ios::beg);
+
+    // Dolocimo stevilo bitov za vhodne in sifrirane bloke
+    int inBits = log2_down(n);
+    int outBits = log2_up(n);
+
+    BitReader reader(input);
+    BitWriter writer(output);
+
+    // V glavo datoteke zapisemo velikost izvorne datoteke, za pravilno desifriranje
+    writer.write_bits(fileSize, 64);
+
+    // Izracunamo stevilo blokov, ki jih moramo zasifrirati
+    unsigned long long totalBits = fileSize * 8;
+    unsigned long long blocks = totalBits / inBits;
+
+    if (totalBits % inBits != 0) {
+        blocks++;
+    }
+
+    for (unsigned long long i = 0; i < blocks; i++) {
+        // Preberemo blok bitov in ga sifriramo
+        unsigned long long M = reader.read_bits(inBits);
+        unsigned long long C = modular_exponentiation(M, e, n);
+        writer.write_bits(C, outBits);
+    }
+
+    writer.flush();
+
+    return true;
+}
+
+// Desifriranje datotek z privatnim kljucem (d, n)
+// Beremo bloke po log2_up(n) bitov,
+// vsakega desifriramo in zapisemo nazaj z log2_down(n) biti
+bool decrypt_file(const std::string& inputName, const std::string& outputName, long long d, long long n) {
+    std::ifstream input(inputName);
+    std::ofstream output(outputName);
+
+    if (!input || !output) {
+        return false;
+    }
+
+    // Dolocimo stevilo bitov v sifriranem in izvirnem bloku
+    int inBits = log2_down(n);
+    int outBits = log2_up(n);
+
+    BitReader reader(input);
+    BitWriter writer(output);
+
+    // Iz glave izvorne datoteke preberemo velikost v bajtih
+    unsigned long long fileSize = reader.read_bits(64);
+    unsigned long long bitsLeft = fileSize * 8;
+
+    while (bitsLeft > 0) {
+        // Preberemo sifriran blok in ga desifriramo
+        unsigned long long C = reader.read_bits(outBits);
+        unsigned long long M = modular_exponentiation(C, d, n);
+
+        int bitsToWrite = inBits;
+
+        // Za zadnji blok preberemo prvih bitsLeft bitov, preostali so padded nicle ki smo ih dodali pri sifriranju
+        if (bitsLeft < static_cast<unsigned long long>(inBits)) {
+            bitsToWrite = static_cast<int>(bitsLeft);
+        }
+
+        writer.write_bits(M >> (inBits - bitsToWrite), bitsToWrite); // Odreze nicle na koncu bloka
+        bitsLeft -= bitsToWrite;
+    }
+
+    writer.flush();
+
+    return true;
 }
 
 void lcg_test(LCG &lcg) {
@@ -410,6 +500,8 @@ void print_menu() {
     std::cout << "8. Generiranje RSA kljucev" << std::endl;
     std::cout << "9. Sifriranje stevila" << std::endl;
     std::cout << "10. Desifriranje stevila" << std::endl;
+    std::cout << "11. Sifriranje datotek" << std::endl;
+    std::cout << "12. Desifriranje datotek" << std::endl;
     std::cout << "0. Izhod" << std::endl;
     std::cout << "\nIzbira: ";
 }
@@ -629,6 +721,44 @@ int main() {
                 long long M = modular_exponentiation(C, d, n);
 
                 std::cout << "M = " << M << std::endl << std::endl;
+
+                break;
+            }
+
+            case 11: {
+                long long e, n;
+                std::string inputName;
+
+                if (!load_key("pubkey.txt", e, n)) {
+                    std::cout << "Najprej generirajte kljuc.\n" << std::endl;
+                    break;
+                }
+
+                std::cout << "Vnesite ime datoteke za sifriranje: ";
+                std::cin >> inputName;
+
+                if (encrypt_file(inputName, "enc.bin", e, n)) {
+                    std::cout << "Datoteka sifrirana v enc.bin.\n" << std::endl;
+                } else {
+                    std::cout << "Napaka pri odpiranju datotek.\n" << std::endl;
+                }
+
+                break;
+            }
+
+            case 12: {
+                long long d, n;
+
+                if (!load_key("privkey.txt", d, n)) {
+                    std::cout << "Najprej generirajte kljuc.\n" << std::endl;
+                    break;
+                }
+
+                if (decrypt_file("enc.bin", "msg.bin", d, n)) {
+                    std::cout << "Datoteka enc.bin desifrirana v msg.bin.\n" << std::endl;
+                } else {
+                    std::cout << "Napaka pri odpiranju datoteka.\n" << std::endl;
+                }
 
                 break;
             }
