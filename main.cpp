@@ -5,53 +5,41 @@
 
 #include "BitReader.h"
 #include "BitWriter.h"
+#include "LCG.h"
 
-class LCG {
-private:
-    unsigned long long R;
-
-    static constexpr unsigned long long m = (1ULL << 32);
-    static constexpr unsigned long long a = 69069;
-    static constexpr unsigned long long b = 1;
-
-public:
-    LCG(unsigned long long R0 = 0) { R = R0; }
-
-    unsigned long long next() {
-        R = (a * R + b) % m;
-        return R;
-    }
-
-    unsigned long long random(unsigned long long x, unsigned long long y) {
-        return x + next() % (y - x + 1);
-    }
-};
-
+// Dva RSA kljuca, javni (e,n) in privatni (d,n)
 struct RSAKeys {
     long long e, d, n;
 };
 
+// Naivni test prastevilnosti
+// Za prastevilo p preverimo vsa potencialna delitelja manjsa od sqrt(p)
 bool naive_test(unsigned long long p) {
     if (p == 2 || p == 3) return true;
     if (p < 2 || p % 2 == 0) return false;
 
+    // Potencialni delitelj, zacnemo z 3
     unsigned long long j = 3;
 
+    // Gremo od 3 do sqrt(p)
     while (j * j <= p) {
         if (p % j == 0) {
             return false;
         }
 
+        // Preverimo samo liha stevila
         j += 2;
     }
 
     return true;
 }
 
+// Naivno generiranje prastevil
 unsigned long long naive(LCG &lcg, unsigned long long x, unsigned long long y) {
 
     unsigned long long p = lcg.random(x,y);
 
+    // Prastevilo ne more biti sodo, pa povecjamo stevilo da postane liho
     if (p % 2 == 0) {
         p++;
     }
@@ -61,26 +49,31 @@ unsigned long long naive(LCG &lcg, unsigned long long x, unsigned long long y) {
             return p;
         }
 
+        // Naslednje liho stevilo
         p += 2;
 
+        // Ce presezemo zgornjo mejo intervala, se vrnemo na zacetek meje, x + 1 ker je x vedno sod
         if (p > y) {
             p = x + 1;
         }
     }
 }
 
+// a^b mod n
 unsigned long long modular_exponentiation(unsigned long long a, unsigned long long b, unsigned long long n) {
     unsigned long long d = 1;
     int j = 0;
     unsigned long long temp = b;
 
-    while (temp >>= 1) { //Set temp to itself shifted by one bit to the right 1011 -> 0101
+    // Iscemo indeks MSB stevila b
+    while (temp > 1) {
+        temp = temp >> 1;
         j++;
     }
 
     for (int i = j; i >= 0; i--) {
         d = ( d * d ) % n;
-        if ((b >> i) & 1) { // ">>" shift b i bits to the right , "&" is 1 if lsb is 1
+        if ((b >> i) & 1) { // Ce je i-ti bit stevila b = 1, d = d * a % n
             d = (d * a) % n;
         }
     }
@@ -88,9 +81,11 @@ unsigned long long modular_exponentiation(unsigned long long a, unsigned long lo
     return d;
 }
 
+// Miler rabinov test
+// s je st. ponovitev testa, vecji parametar s vecja zanesljivost
 bool miller_rabin_test(LCG &lcg, unsigned long long p, unsigned long long s) {
-    if (p <= 3) return true;   //prime
-    if (p % 2 == 0) return false;   //composite
+    if (p == 2 || p == 3) return true;
+    if (p < 2 || p % 2 == 0) return false;
 
     unsigned long long d = p - 1;
     unsigned long long k = 0;
@@ -100,24 +95,26 @@ bool miller_rabin_test(LCG &lcg, unsigned long long p, unsigned long long s) {
         k++;
     }
 
+    // Test ponovimo s krat, vsakic z drugo a
     for (unsigned long long j = 1; j <= s; j++) {
         unsigned long long a = lcg.random(2, p - 2);
-        unsigned long long x = modular_exponentiation(a, d, p);
+        unsigned long long x = modular_exponentiation(a, d, p); // Iscemo dokaz da je p sestavljeno
 
         if (x == 1) continue;
 
-        //če ∃i..
+        // če ∃i: a^(d * 2^i)≡−1(mod p) potem je p verjetno praštevilo
         for (unsigned long long i = 0; i < k; i++) {
             if (x == p - 1) break;
             x = (x * x) % p;
         }
 
-        if (x != p - 1) return false;   //composite number
+        if (x != p - 1) return false;   // Verjetno sestavljeno stevilo
     }
 
-    return true;   //probably prime number
+    return true;   // Verjetno prastevilo
 }
 
+// Generiranje prastevil z Miller-Rabinovim testom
 unsigned long long miller_rabin_generate(LCG &lcg, unsigned long long min, unsigned long long max, unsigned long long s) {
     unsigned long long p = lcg.random(min, max);
 
@@ -136,10 +133,14 @@ unsigned long long miller_rabin_generate(LCG &lcg, unsigned long long min, unsig
     return p;
 }
 
+// Najmanjse n bitno stevilo
+// Za 5 bitov -> 10000
 unsigned long long min_from_bits(int bits) {
     return 1ULL << (bits - 1);
 }
 
+// Najvecje n bitno stevilo
+// Za 5 bitov -> 100000 - 1 = 11111
 unsigned long long max_from_bits(int bits) {
     return (1ULL << bits) - 1;
 }
@@ -154,6 +155,8 @@ long long mod(long long a, long long n) {
     return reminder;
 }
 
+// Razsirjeni Evklidov algoritam
+// Posice stevilo d, ki je gcd(a, b) ter x in y, za katere velja d = a*b + b*y
 void extended_euclid(long long a, long long b, long long& d, long long& x, long long& y) {
     if (b == 0) {
         d = a;
@@ -162,7 +165,7 @@ void extended_euclid(long long a, long long b, long long& d, long long& x, long 
     } else {
         long long n_d, n_x, n_y;
 
-        extended_euclid(b, a % b, n_d, n_x, n_y);
+        extended_euclid(b, mod(a, b), n_d, n_x, n_y);
 
         d = n_d;
         x = n_y;
@@ -170,6 +173,8 @@ void extended_euclid(long long a, long long b, long long& d, long long& x, long 
     }
 }
 
+// Izracun modulske linearne enacbe a*x kongrurentno b mod n
+// Pri racunanju multiplikativnega inverza, ko je b = 1 in gcd(a, n) = 1, obstaja natanko ena resitev modula n
 std::vector<long long> modular_linear_equation_solver(long long a, long long b, long long n) {
     long long d, x, y;
 
@@ -190,6 +195,7 @@ std::vector<long long> modular_linear_equation_solver(long long a, long long b, 
     return solutions;
 }
 
+// Generira prastevilo z bits biti in metodo
 unsigned long long generate_prime(LCG& lcg, int bits, bool useMillerRabin, unsigned long long s) {
     unsigned long long min = min_from_bits(bits);
     unsigned long long max = max_from_bits(bits);
@@ -224,17 +230,20 @@ int log2_up(unsigned long long n) {
     return log2_down(n - 1) + 1;
 }
 
+// Generiranje RSA kljucev
 RSAKeys generate_keys(LCG& lcg, int bits, bool useMillerRabin, unsigned long long s) {
+    // 1. Izberemo dva razlicna prastevila p in q z enakim stevilom bitov, torej priblizno enaki veliksoti
     unsigned long long p = generate_prime(lcg, bits, useMillerRabin, s);
     unsigned long long q;
     do {
         q = generate_prime(lcg, bits, useMillerRabin, s);
     } while (q == p);
 
+    // 2. Izracunamo n = p * q in Eulerjevo/totientno funkcijo phi
     long long n = static_cast<long long>(p * q);
     long long fi = static_cast<long long>((p - 1) * (q - 1));
 
-    // Step 3: random odd e with 1 < e < phi and gcd(e,phi) = 1
+    // 3. Nakljucno manjse liho stevilo e, tako da velja 1 < e < fi in gcd (e, fi) = 1
     long long e, gcd, x, y;
     do {
         e = static_cast<long long>(lcg.random(3, fi - 1));
@@ -242,10 +251,11 @@ RSAKeys generate_keys(LCG& lcg, int bits, bool useMillerRabin, unsigned long lon
     } while (e % 2 == 0 || gcd != 1);
 
     // Step 4: Get multiplicative inverse of e mod phi => e * d = 1 (mod phi)
+    // 4. Izracunamo skriti eksopnent d kot multiplikativni inverz e po modulu fi
     std::vector<long long> solutions = modular_linear_equation_solver(e, 1, fi);
-    long long d = solutions[0]; // gcd is 1, there is exactly 1 solution
+    long long d = solutions[0]; // gcd je 1, torej ena resitev
 
-    // Step 5: public is pair of e and n, private is pair of d and n
+    // 5. Javni kljuc P = (e, n) in privatni kljuc S = (d, n)
     RSAKeys keys;
     keys.e = e;
     keys.d = d;
@@ -284,8 +294,8 @@ bool load_key(const std::string& filename, long long& e, long long& n) {
 // Datoteke beremo po log2_down(n) bitov
 // Sifriran blok C je lahko najvec n-1, zato ga zapisemo z log2_up(n) biti, en bit vec kot M
 bool encrypt_file(const std::string& inputName, const std::string& outputName, long long e, long long n) {
-    std::ifstream input(inputName);
-    std::ofstream output(outputName);
+    std::ifstream input(inputName, std::ios::binary);
+    std::ofstream output(outputName, std::ios::binary);
 
     if (!input || !output) {
         return false;
@@ -330,8 +340,8 @@ bool encrypt_file(const std::string& inputName, const std::string& outputName, l
 // Beremo bloke po log2_up(n) bitov,
 // vsakega desifriramo in zapisemo nazaj z log2_down(n) biti
 bool decrypt_file(const std::string& inputName, const std::string& outputName, long long d, long long n) {
-    std::ifstream input(inputName);
-    std::ofstream output(outputName);
+    std::ifstream input(inputName, std::ios::binary);
+    std::ofstream output(outputName, std::ios::binary);
 
     if (!input || !output) {
         return false;
@@ -487,6 +497,107 @@ void miller_rabin_s_timing_test(LCG lcg) {
     std::cout << "Results saved to timing_s.csv file" << std::endl;
 }
 
+// Cas generiranja RSA kljucev glede na stevilo bitov p in q
+void keygen_timing_test(LCG& lcg) {
+    const int minBits = 3;
+    const int maxBits = 15;
+    const int runs = 2000;
+    const unsigned long long s = 10;
+
+    std::ofstream outfile("timing_keygen.csv");
+    if (!outfile) {
+        std::cerr << "Unable to open timing_keygen.csv" << std::endl;
+        return;
+    }
+
+    outfile << "Bits_pq,Bits_n,Naive_ns,MillerRabin_ns\n";
+
+    volatile long long sink = 0;
+
+    for (int bits = minBits; bits <= maxBits; bits++) {
+        // Naivna metoda
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < runs; i++) {
+            RSAKeys keys = generate_keys(lcg, bits, false, s);
+            sink = keys.n;
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        double naiveAvg = std::chrono::duration<double, std::nano>(end - start).count() / runs;
+
+        // Miller-Rabin
+        start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < runs; i++) {
+            RSAKeys keys = generate_keys(lcg, bits, true, s);
+            sink = keys.n;
+        }
+        end = std::chrono::high_resolution_clock::now();
+        double mrAvg = std::chrono::duration<double, std::nano>(end - start).count() / runs;
+
+        outfile << bits << "," << 2 * bits << "," << naiveAvg << "," << mrAvg << "\n";
+        std::cout << "Bits p,q: " << bits << " done" << std::endl;
+    }
+
+    outfile.close();
+    std::cout << "Results saved to timing_keygen.csv file" << std::endl;
+}
+
+// Cas sifriranja in desifriranja stevila glede na stevilo bitov n
+// Pri vsakem n izvedemo veliko ponovitev, vsakic z drugim M
+void crypt_timing_test(LCG& lcg) {
+    const int minBits = 3;
+    const int maxBits = 15;
+    const int runs = 20000;
+
+    std::ofstream outfile("timing_crypt.csv");
+    if (!outfile) {
+        std::cerr << "Unable to open timing_crypt.csv" << std::endl;
+        return;
+    }
+
+    outfile << "Bits_pq,Bits_n,Encrypt_ns,Decrypt_ns\n";
+
+    volatile unsigned long long sink = 0;
+
+    for (int bits = minBits; bits <= maxBits; bits++) {
+        RSAKeys keys = generate_keys(lcg, bits, true, 10);
+
+        // Vnaprej pripravimo nakljucna sporocila M iz [1, n-1]
+        std::vector<unsigned long long> messages(runs), ciphers(runs);
+        for (int i = 0; i < runs; i++) {
+            messages[i] = lcg.random(1, keys.n - 1);
+        }
+
+        // Sifriranje
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < runs; i++) {
+            ciphers[i] = modular_exponentiation(messages[i], keys.e, keys.n);
+            sink = ciphers[i];
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        double encAvg = std::chrono::duration<double, std::nano>(end - start).count() / runs;
+
+        // Desifriranje
+        int errors = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < runs; i++) {
+            sink = modular_exponentiation(ciphers[i], keys.d, keys.n);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        double decAvg = std::chrono::duration<double, std::nano>(end - start).count() / runs;
+
+        // Preverimo pravilnost (izven merjenja casa)
+        for (int i = 0; i < runs; i++) {
+            if (modular_exponentiation(ciphers[i], keys.d, keys.n) != messages[i]) errors++;
+        }
+
+        outfile << bits << "," << 2 * bits << "," << encAvg << "," << decAvg << "\n";
+        std::cout << "Bits p,q: " << bits << " done, errors: " << errors << std::endl;
+    }
+
+    outfile.close();
+    std::cout << "Results saved to timing_crypt.csv file" << std::endl;
+}
+
 void print_menu() {
     std::cout << "\t\tGENERATOR PRASTEVIL" << std::endl;
     std::cout << "----------------------------------------" << std::endl;
@@ -502,6 +613,8 @@ void print_menu() {
     std::cout << "10. Desifriranje stevila" << std::endl;
     std::cout << "11. Sifriranje datotek" << std::endl;
     std::cout << "12. Desifriranje datotek" << std::endl;
+    std::cout << "13. Test casovne zahtevnosti generiranja kljucev" << std::endl;
+    std::cout << "14. Test casovne zahtevnosti sifriranja in desifriranja" << std::endl;
     std::cout << "0. Izhod" << std::endl;
     std::cout << "\nIzbira: ";
 }
@@ -760,6 +873,18 @@ int main() {
                     std::cout << "Napaka pri odpiranju datoteka.\n" << std::endl;
                 }
 
+                break;
+            }
+
+            case 13: {
+                keygen_timing_test(lcg);
+                std::cout << std::endl;
+                break;
+            }
+
+            case 14: {
+                crypt_timing_test(lcg);
+                std::cout << std::endl;
                 break;
             }
 
