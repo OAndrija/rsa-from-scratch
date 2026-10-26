@@ -198,6 +198,29 @@ unsigned long long generate_prime(LCG& lcg, int bits, bool useMillerRabin, unsig
     return naive(lcg, min, max);
 }
 
+// https://algomaster.io/learn/dsa/logarithms
+// Steje, kolikokrat n delimo z 2, pre da pride do 1
+int log2_down(unsigned long long n) {
+    int result = 0;
+
+    while (n > 1) {
+        n /= 2;
+        result++;
+    }
+
+    return result;
+}
+
+// https://stackoverflow.com/questions/3272424/compute-fast-log-base-2-ceiling/51351885#51351885
+int log2_up(unsigned long long n) {
+    if (n <= 1) {
+        return 0;
+    }
+
+    // (n-1) zagotljava da se potence stevila dva obravnavajo pravilo
+    return log2_down(n - 1) + 1;
+}
+
 RSAKeys generate_keys(LCG& lcg, int bits, bool useMillerRabin, unsigned long long s) {
     // Step 1: generate two different prime numbers
     unsigned long long p = generate_prime(lcg, bits, useMillerRabin, s);
