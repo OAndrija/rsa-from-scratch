@@ -1,17 +1,28 @@
 cmake_minimum_required(VERSION 4.3)
-project(vaja1)
+project(vaja1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(vaja1 src/main.cpp
-        src/core/BitReader.h
-        src/core/BitWriter.h
-        src/core/LCG.h
-        src/core/MathUtils.h
+find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent)
+qt_standard_project_setup()   # turns on AUTOMOC / AUTOUIC for you
+
+# Logic, no UI
+add_library(vaja1_core STATIC
         src/core/MathUtils.cpp
         src/core/Primes.cpp
-        src/core/Primes.h
         src/core/RSA.cpp
-        src/core/RSA.h
         src/benchmarks/Benchmark.cpp
-        src/benchmarks/Benchmark.h)
+)
+target_include_directories(vaja1_core PUBLIC src)
+
+
+# Qt GU
+qt_add_executable(vaja1
+        src/gui/main.cpp
+        src/gui/MainWindow.h
+        src/gui/MainWindow.cpp
+        src/gui/MainWindow.h
+        src/gui/MainWindow.cpp
+)
+target_link_libraries(vaja1 PRIVATE vaja1_core Qt6::Widgets Qt6::Concurrent)
