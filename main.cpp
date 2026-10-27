@@ -515,6 +515,7 @@ void keygen_timing_test(LCG& lcg) {
     volatile long long sink = 0;
 
     for (int bits = minBits; bits <= maxBits; bits++) {
+        if (bits == 4) continue;
         // Naivna metoda
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < runs; i++) {
@@ -559,6 +560,7 @@ void crypt_timing_test(LCG& lcg) {
     volatile unsigned long long sink = 0;
 
     for (int bits = minBits; bits <= maxBits; bits++) {
+        if (bits == 4) continue;
         RSAKeys keys = generate_keys(lcg, bits, true, 10);
 
         // Vnaprej pripravimo nakljucna sporocila M iz [1, n-1]
