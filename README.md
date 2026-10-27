@@ -75,7 +75,7 @@ Both timing functions take the generator by value, so they work on a copy and al
 
 | File | Description |
 |------|-------------|
-| `main.cpp` | The whole program. |
+| `src/main.cpp` | The whole program. |
 | `histogram.csv` | Created by option 5. |
 | `timing.csv` | Created by option 6. |
 | `timing_s.csv` | Created by option 7. |
