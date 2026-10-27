@@ -1,6 +1,6 @@
 #ifndef VAJA1_BITREADER_H
 #define VAJA1_BITREADER_H
-#include <iosfwd>
+#include <fstream>
 
 // https://www.geeksforgeeks.org/cpp/cpp-bitwise-operators/
 class BitReader {
